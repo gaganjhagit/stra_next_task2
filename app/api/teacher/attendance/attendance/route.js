@@ -12,6 +12,7 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const classId = searchParams.get('classId');
+    const subjectId = searchParams.get('subjectId');
     const date = searchParams.get('date');
 
     if (!classId || !date) {
@@ -21,23 +22,39 @@ export async function GET(request) {
       );
     }
 
-    // Get existing attendance records
-    const [attendance] = await pool.execute(
-      `SELECT u.id, u.name, u.email, a.status, a.notes
-      FROM users u
-      JOIN enrollments e ON e.student_id = u.id
-      LEFT JOIN attendance a ON a.student_id = u.id AND a.class_id = ? AND a.date = ?
-      WHERE e.class_id = ?
-      ORDER BY u.name`,
-      [classId, date, classId]
-    );
+    // Get existing attendance records with students enrolled in class
+    // If subjectId is provided, filter by it; otherwise get all attendance for the class
+    let attendance;
+    if (subjectId) {
+      [attendance] = await pool.execute(
+        `SELECT u.id, u.name, u.email, a.status, a.notes
+        FROM users u
+        JOIN enrollments e ON e.student_id = u.id
+        LEFT JOIN attendance a ON a.student_id = u.id AND a.class_id = ? AND a.subject_id = ? AND a.date = ?
+        WHERE e.class_id = ?
+        ORDER BY u.name`,
+        [classId, subjectId, date, classId]
+      );
+    } else {
+      [attendance] = await pool.execute(
+        `SELECT u.id, u.name, u.email, a.status, a.notes
+        FROM users u
+        JOIN enrollments e ON e.student_id = u.id
+        LEFT JOIN attendance a ON a.student_id = u.id AND a.class_id = ? AND a.date = ?
+        WHERE e.class_id = ?
+        ORDER BY u.name`,
+        [classId, date, classId]
+      );
+    }
 
-    // Format the response
+    console.log('Attendance records found:', attendance.length);
+
+    // Format the response - set default status to 'present' if no attendance record exists
     const students = attendance.map(student => ({
       id: student.id,
       name: student.name,
       email: student.email,
-      status: student.status || '',
+      status: student.status || 'present',
       notes: student.notes || ''
     }));
 

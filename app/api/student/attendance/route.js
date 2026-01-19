@@ -23,14 +23,14 @@ export async function GET() {
       JOIN classes c ON c.id = a.class_id
       JOIN subjects s ON s.id = a.subject_id
       WHERE a.student_id = ? 
-      ORDER BY a.date DESC 
-      LIMIT 100`,
+      ORDER BY a.date DESC, a.id DESC
+      LIMIT 500`,
       [user.id]
     );
 
-    console.log('Attendance records found:', records);
+    console.log(`Found ${records.length} attendance records for student ${user.id}`);
 
-    return NextResponse.json(records);
+    return NextResponse.json(records || []);
   } catch (error) {
     console.error('Error in GET /api/student/attendance:', error);
     return NextResponse.json(

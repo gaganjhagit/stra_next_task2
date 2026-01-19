@@ -13,12 +13,26 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    // Handle params - could be Promise in Next.js 15+ or direct object
+    let resolvedParams = params;
+    if (params instanceof Promise) {
+      resolvedParams = await params;
+    }
+    
+    const { id } = resolvedParams;
     const { classId, subjectId, dayOfWeek, startTime, endTime, room } = await request.json();
 
     if (!classId || !subjectId || !dayOfWeek || !startTime || !endTime) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    // Validate time
+    if (startTime >= endTime) {
+      return NextResponse.json(
+        { error: 'End time must be after start time' },
         { status: 400 }
       );
     }
@@ -81,7 +95,13 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { id } = params;
+    // Handle params - could be Promise in Next.js 15+ or direct object
+    let resolvedParams = params;
+    if (params instanceof Promise) {
+      resolvedParams = await params;
+    }
+    
+    const { id } = resolvedParams;
 
     // Verify ownership and delete
     const [result] = await pool.execute(

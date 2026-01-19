@@ -1,12 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Notification from '@/components/Notification';
+import TeacherNav from '@/components/TeacherNav';
 
 export default function TeacherAnalytics() {
   const [classes, setClasses] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notification, setNotification] = useState({ type: '', message: '' });
 
   useEffect(() => {
     fetchClasses();
@@ -27,6 +30,7 @@ export default function TeacherAnalytics() {
       }
     } catch (error) {
       console.error('Failed to fetch classes:', error);
+      setNotification({ type: 'error', message: 'Failed to fetch classes: ' + error.message });
     } finally {
       setLoading(false);
     }
@@ -34,13 +38,22 @@ export default function TeacherAnalytics() {
 
   const fetchAnalytics = async (classId) => {
     try {
+      setLoading(true);
       const response = await fetch(`/api/teacher/analytics?classId=${classId}`);
       if (response.ok) {
         const data = await response.json();
         setAnalytics(data);
+      } else {
+        const error = await response.json();
+        setNotification({ type: 'error', message: error.error || 'Failed to fetch analytics' });
+        setAnalytics(null);
       }
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
+      setNotification({ type: 'error', message: 'Error fetching analytics: ' + error.message });
+      setAnalytics(null);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -55,6 +68,7 @@ export default function TeacherAnalytics() {
           <h1 className="text-2xl font-bold">Class Analytics / कक्षा विश्लेषण</h1>
         </div>
       </nav>
+      <TeacherNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="space-y-6">
@@ -204,6 +218,13 @@ export default function TeacherAnalytics() {
           )}
         </div>
       </main>
+      
+      {/* Notification */}
+      <Notification
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification({ type: '', message: '' })}
+      />
     </div>
   );
 }

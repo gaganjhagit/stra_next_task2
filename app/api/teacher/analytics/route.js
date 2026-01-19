@@ -52,23 +52,41 @@ export async function GET(request) {
       [classId, user.id]
     );
 
-    // Get grade distribution
-    const [gradeDistribution] = await pool.execute(
+    // Get grade distribution by student average
+    const [studentAverages] = await pool.execute(
       `SELECT 
-        CASE 
-          WHEN AVG(g.grade / g.max_grade * 100) >= 90 THEN 'A'
-          WHEN AVG(g.grade / g.max_grade * 100) >= 80 THEN 'B'
-          WHEN AVG(g.grade / g.max_grade * 100) >= 70 THEN 'C'
-          WHEN AVG(g.grade / g.max_grade * 100) >= 60 THEN 'D'
-          ELSE 'F'
-        END as grade,
-        COUNT(*) as count
+        AVG(CAST(g.grade AS DECIMAL(5,2)) / CAST(g.max_grade AS DECIMAL(5,2)) * 100) as average
       FROM grades g
+      JOIN users u ON g.student_id = u.id
       WHERE g.class_id = ? AND g.teacher_id = ?
-      GROUP BY u.id
-      HAVING AVG(g.grade / g.max_grade * 100) >= 0`,
+      GROUP BY u.id`,
       [classId, user.id]
     );
+    
+    // Calculate grade distribution
+    const gradeDistribution = [
+      { grade: 'A', count: 0, percentage: 0 },
+      { grade: 'B', count: 0, percentage: 0 },
+      { grade: 'C', count: 0, percentage: 0 },
+      { grade: 'D', count: 0, percentage: 0 },
+      { grade: 'F', count: 0, percentage: 0 }
+    ];
+    
+    studentAverages.forEach(avg => {
+      const average = parseFloat(avg.average || 0);
+      if (average >= 90) gradeDistribution[0].count++;
+      else if (average >= 80) gradeDistribution[1].count++;
+      else if (average >= 70) gradeDistribution[2].count++;
+      else if (average >= 60) gradeDistribution[3].count++;
+      else gradeDistribution[4].count++;
+    });
+    
+    const totalStudents = studentAverages.length;
+    if (totalStudents > 0) {
+      gradeDistribution.forEach(grade => {
+        grade.percentage = ((grade.count / totalStudents) * 100).toFixed(1);
+      });
+    }
 
     // Get subject performance
     const [subjectPerformance] = await pool.execute(
@@ -114,18 +132,17 @@ export async function GET(request) {
     const stats = gradeStats[0];
     const attendance = attendanceStats[0];
 
+    const totalStudentsCount = students[0]?.total || 0;
+    const averageGrade = stats && stats.average_grade ? parseFloat(stats.average_grade).toFixed(1) : '0.0';
+    const passRate = stats && stats.total_grades > 0 ? ((stats.pass_count / stats.total_grades) * 100).toFixed(1) : '0.0';
+    const attendanceRate = attendance && attendance.total > 0 ? ((attendance.present / attendance.total) * 100).toFixed(1) : '0.0';
+
     const analytics = {
-      totalStudents: students[0].total,
-      averageGrade: stats ? parseFloat(stats.average_grade || 0).toFixed(1) : 0,
-      passRate: stats ? ((stats.pass_count / stats.total_grades) * 100).toFixed(1) : 0,
-      attendanceRate: attendance ? ((attendance.present / attendance.total) * 100).toFixed(1) : 0,
-      gradeDistribution: [
-        { grade: 'A', percentage: 0, count: 0 },
-        { grade: 'B', percentage: 0, count: 0 },
-        { grade: 'C', percentage: 0, count: 0 },
-        { grade: 'D', percentage: 0, count: 0 },
-        { grade: 'F', percentage: 0, count: 0 }
-      ],
+      totalStudents: totalStudentsCount,
+      averageGrade: averageGrade,
+      passRate: passRate,
+      attendanceRate: attendanceRate,
+      gradeDistribution: gradeDistribution,
       subjectPerformance: subjectPerformance.map(s => ({
         name: s.subject_name,
         average: parseFloat(s.average || 0)
@@ -142,14 +159,6 @@ export async function GET(request) {
         average: parseFloat(s.average || 0).toFixed(1)
       }))
     };
-
-    // Calculate grade distribution percentages
-    const totalGrades = analytics.gradeDistribution.reduce((sum, g) => sum + g.count, 0);
-    if (totalGrades > 0) {
-      analytics.gradeDistribution.forEach(grade => {
-        grade.percentage = ((grade.count / totalGrades) * 100).toFixed(1);
-      });
-    }
 
     return NextResponse.json(analytics);
 

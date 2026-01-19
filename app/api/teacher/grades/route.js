@@ -85,6 +85,22 @@ export async function POST(request) {
       );
     }
 
+    // Validate grades
+    for (const grade of grades) {
+      if (!grade.studentId || grade.grade === undefined || grade.grade === null || grade.grade === '') {
+        return NextResponse.json(
+          { error: 'Invalid grade data. All fields are required.' },
+          { status: 400 }
+        );
+      }
+      if (grade.grade < 0 || (grade.maxGrade && grade.grade > grade.maxGrade)) {
+        return NextResponse.json(
+          { error: `Invalid grade value for student. Grade must be between 0 and ${grade.maxGrade || 100}` },
+          { status: 400 }
+        );
+      }
+    }
+
     // Process each grade
     const results = [];
     for (const grade of grades) {

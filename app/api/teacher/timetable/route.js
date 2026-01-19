@@ -50,6 +50,14 @@ export async function POST(request) {
       );
     }
 
+    // Validate time
+    if (startTime >= endTime) {
+      return NextResponse.json(
+        { error: 'End time must be after start time' },
+        { status: 400 }
+      );
+    }
+
     // Check for conflicts
     const [conflicts] = await pool.execute(
       `SELECT COUNT(*) as count FROM timetable
@@ -61,7 +69,7 @@ export async function POST(request) {
 
     if (conflicts[0].count > 0) {
       return NextResponse.json(
-        { error: 'Time slot conflicts with existing schedule' },
+        { error: 'Time slot conflicts with existing schedule. Please choose a different time.' },
         { status: 409 }
       );
     }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import pool from '@/lib/db';
 
-// GET - Get students in a class for attendance
+// GET - Get subjects for a specific class that the teacher teaches
 export async function GET(request) {
   try {
     const user = await getCurrentUser();
@@ -20,26 +20,22 @@ export async function GET(request) {
       );
     }
 
-    console.log('Fetching students for class:', classId);
-
-    // Get students enrolled in the class
-    const [students] = await pool.execute(
-      `SELECT u.id, u.name, u.email
-      FROM users u
-      JOIN enrollments e ON e.student_id = u.id
-      WHERE e.class_id = ?
-      ORDER BY u.name`,
-      [classId]
+    // Get subjects that the teacher teaches for this specific class
+    const [subjects] = await pool.execute(
+      `SELECT DISTINCT s.id, s.name, s.code
+       FROM subjects s
+       JOIN timetable t ON t.subject_id = s.id
+       WHERE t.teacher_id = ? AND t.class_id = ?
+       ORDER BY s.name`,
+      [user.id, classId]
     );
 
-    console.log('Students found:', students.length);
-
-    return NextResponse.json(students);
+    return NextResponse.json(subjects);
   } catch (error) {
-    console.error('Error fetching students:', error);
     return NextResponse.json(
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
   }
 }
+

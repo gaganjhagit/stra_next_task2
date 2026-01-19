@@ -14,100 +14,23 @@ export default function Attendance() {
 
   const fetchAttendance = async () => {
     try {
-      console.log('Fetching student attendance...');
-      const response = await fetch('/api/student/attendance');
-      console.log('Response status:', response.status);
+      setLoading(true);
+      const response = await fetch('/api/student/attendance', {
+        credentials: 'include'
+      });
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Attendance data:', data);
-        
-        if (data && data.length > 0) {
-          setRecords(data);
-        } else {
-          // Add sample attendance records for testing
-          console.log('No attendance records found, adding sample data...');
-          const sampleRecords = [
-            {
-              date: '2024-01-15',
-              status: 'present',
-              notes: 'On time',
-              class_name: 'Grade 10A',
-              subject_name: 'Mathematics'
-            },
-            {
-              date: '2024-01-14',
-              status: 'present',
-              notes: 'Good participation',
-              class_name: 'Grade 10A',
-              subject_name: 'English'
-            },
-            {
-              date: '2024-01-13',
-              status: 'late',
-              notes: '5 minutes late',
-              class_name: 'Grade 10A',
-              subject_name: 'Science'
-            },
-            {
-              date: '2024-01-12',
-              status: 'absent',
-              notes: 'Sick leave',
-              class_name: 'Grade 10A',
-              subject_name: 'History'
-            }
-          ];
-          setRecords(sampleRecords);
-        }
+        // Always use real data from API, even if empty
+        setRecords(Array.isArray(data) ? data : []);
       } else {
-        // console.error('Response status:', response.status);
-        // console.error('Response headers:', response.headers);
-        
-        // Try to get error text safely
-        let errorText;
-        try {
-          errorText = await response.text();
-          // console.error('Error response text:', errorText);
-        } catch (textError) {
-          console.error('Could not read response text:', textError);
-          errorText = 'Unknown error';
-        }
-        
-        // console.error('Error fetching attendance:', errorText);
-        
-        // Add sample attendance records for testing
-        const sampleRecords = [
-          {
-            date: '2024-01-15',
-            status: 'present',
-            notes: 'On time',
-            class_name: 'Grade 10A',
-            subject_name: 'Mathematics'
-          },
-          {
-            date: '2024-01-14',
-            status: 'present',
-            notes: 'Good participation',
-            class_name: 'Grade 10A',
-            subject_name: 'English'
-          }
-        ];
-        setRecords(sampleRecords);
+        const error = await response.json().catch(() => ({ error: 'Failed to fetch attendance' }));
+        console.error('Error fetching attendance:', error);
+        setRecords([]);
       }
     } catch (error) {
       console.error('Failed to fetch attendance:', error);
-      
-      // Add sample attendance records for testing
-      const sampleRecords = [
-        {
-          date: '2024-01-15',
-          status: 'present',
-          notes: 'On time',
-          class_name: 'Grade 10A',
-          subject_name: 'Mathematics'
-        }
-      ];
-      setRecords(sampleRecords);
+      setRecords([]);
     } finally {
       setLoading(false);
     }
@@ -171,18 +94,6 @@ export default function Attendance() {
       </nav>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Debug Info */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <h3 className="text-sm font-semibold text-yellow-800 mb-2">Debug Information:</h3>
-          <div className="text-xs text-yellow-700">
-            <p>Records found: {records.length}</p>
-            <p>Loading: {loading ? 'Yes' : 'No'}</p>
-            <p>Filter: {filter}</p>
-            <p>Sort by: {sortBy}</p>
-            <p>Stats: {JSON.stringify(stats)}</p>
-          </div>
-        </div>
-
         {records.length > 0 ? (
           <>
             {/* Statistics Cards */}
@@ -260,7 +171,7 @@ export default function Attendance() {
                   </thead>
                   <tbody className="divide-y">
                     {filteredAndSortedRecords.map((record, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50">
+                      <tr key={`${record.date}-${record.class_name}-${record.subject_name}-${idx}`} className="hover:bg-gray-50">
                         <td className="px-6 py-3">
                           <div className="flex items-center">
                             <span className="font-medium">{new Date(record.date).toLocaleDateString('hi-IN')}</span>

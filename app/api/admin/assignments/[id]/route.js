@@ -2,14 +2,11 @@ import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 import pool from '@/lib/db';
 
-// DELETE - Delete a grade
-export async function DELETE(
-  request, 
-  { params } 
-) {
+// DELETE - Remove class assignment from teacher
+export async function DELETE(request, { params }) {
   try {
     const user = await getCurrentUser();
-    if (!user || user.role !== 'teacher') {
+    if (!user || user.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -20,21 +17,29 @@ export async function DELETE(
     }
     
     const { id } = resolvedParams;
+    const assignmentId = parseInt(id);
 
-    // Verify ownership and delete
+    if (isNaN(assignmentId)) {
+      return NextResponse.json(
+        { error: 'Invalid assignment ID' },
+        { status: 400 }
+      );
+    }
+
+    // Delete timetable entry (this removes the class assignment)
     const [result] = await pool.execute(
-      'DELETE FROM grades WHERE id = ? AND teacher_id = ?',
-      [id, user.id]
+      'DELETE FROM timetable WHERE id = ?',
+      [assignmentId]
     );
 
     if (result.affectedRows === 0) {
       return NextResponse.json(
-        { error: 'Grade not found or unauthorized' },
+        { error: 'Assignment not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json({ message: 'Grade deleted successfully' });
+    return NextResponse.json({ message: 'Assignment removed successfully' });
 
   } catch (error) {
     return NextResponse.json(
@@ -43,3 +48,4 @@ export async function DELETE(
     );
   }
 }
+

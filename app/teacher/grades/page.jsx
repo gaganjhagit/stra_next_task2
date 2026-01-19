@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Notification from '@/components/Notification';
+import ConfirmModal from '@/components/ConfirmModal';
+import TeacherNav from '@/components/TeacherNav';
 
 export default function TeacherGrades() {
   const [classes, setClasses] = useState([]);
@@ -14,6 +17,8 @@ export default function TeacherGrades() {
   const [existingGrades, setExistingGrades] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [activeTab, setActiveTab] = useState('upload'); // 'upload' or 'history'
+  const [notification, setNotification] = useState({ type: '', message: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     fetchClassesAndSubjects();
@@ -64,37 +69,15 @@ export default function TeacherGrades() {
       } else {
         const error = await response.json();
         console.error('Error response:', error);
-        alert('Failed to fetch classes and subjects: ' + error.error);
-        
-        // Add fallback data on error
-        setClasses([
-          { id: '1', name: 'Grade 10A' },
-          { id: '2', name: 'Grade 10B' },
-          { id: '3', name: 'Grade 11A' }
-        ]);
-        setSubjects([
-          { id: '1', name: 'Mathematics' },
-          { id: '2', name: 'English' },
-          { id: '3', name: 'Science' },
-          { id: '4', name: 'History' }
-        ]);
+        setNotification({ type: 'error', message: 'Failed to fetch classes and subjects: ' + error.error });
+        setClasses([]);
+        setSubjects([]);
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      alert('Error fetching classes and subjects: ' + error.message);
-      
-      // Add fallback data on error
-      setClasses([
-        { id: '1', name: 'Grade 10A' },
-        { id: '2', name: 'Grade 10B' },
-        { id: '3', name: 'Grade 11A' }
-      ]);
-      setSubjects([
-        { id: '1', name: 'Mathematics' },
-        { id: '2', name: 'English' },
-        { id: '3', name: 'Science' },
-        { id: '4', name: 'History' }
-      ]);
+      setNotification({ type: 'error', message: 'Error fetching classes and subjects: ' + error.message });
+      setClasses([]);
+      setSubjects([]);
     } finally {
       setLoading(false);
     }
@@ -126,49 +109,13 @@ export default function TeacherGrades() {
       } else {
         const error = await response.json();
         console.error('Error fetching students:', error);
-        alert('Failed to fetch students: ' + error.error);
-        
-        // Add sample students for testing
-        const sampleStudents = [
-          { id: '1', name: 'Alice Student', email: 'alice@school.com' },
-          { id: '2', name: 'Bob Student', email: 'bob@school.com' },
-          { id: '3', name: 'Charlie Student', email: 'charlie@school.com' }
-        ];
-        setStudents(sampleStudents);
-        
-        const initialGradeData = {};
-        sampleStudents.forEach(student => {
-          initialGradeData[student.id] = {
-            grade: '',
-            maxGrade: '100',
-            gradeType: 'assignment',
-            description: ''
-          };
-        });
-        setGradeData(initialGradeData);
+        setNotification({ type: 'error', message: 'Failed to fetch students: ' + error.error });
+        setStudents([]);
       }
     } catch (error) {
       console.error('Failed to fetch students:', error);
-      alert('Error fetching students: ' + error.message);
-      
-      // Add sample students for testing
-      const sampleStudents = [
-        { id: '1', name: 'Alice Student', email: 'alice@school.com' },
-        { id: '2', name: 'Bob Student', email: 'bob@school.com' },
-        { id: '3', name: 'Charlie Student', email: 'charlie@school.com' }
-      ];
-      setStudents(sampleStudents);
-      
-      const initialGradeData = {};
-      sampleStudents.forEach(student => {
-        initialGradeData[student.id] = {
-          grade: '',
-          maxGrade: '100',
-          gradeType: 'assignment',
-          description: ''
-        };
-      });
-      setGradeData(initialGradeData);
+      setNotification({ type: 'error', message: 'Error fetching students: ' + error.message });
+      setStudents([]);
     }
   };
 
@@ -196,7 +143,7 @@ export default function TeacherGrades() {
 
   const uploadGrades = async () => {
     if (!selectedClass || !selectedSubject) {
-      alert('कृपया कक्षा और विषय चुनें');
+      setNotification({ type: 'error', message: 'Please select both class and subject / कृपया कक्षा और विषय चुनें' });
       return;
     }
 
@@ -217,8 +164,16 @@ export default function TeacherGrades() {
     console.log('Valid grades to upload:', validGrades); // Debug log
 
     if (validGrades.length === 0) {
-      alert('कृपया कम से कम एक grade दर्ज करें');
+      setNotification({ type: 'error', message: 'Please enter at least one grade / कृपया कम से कम एक grade दर्ज करें' });
       return;
+    }
+    
+    // Validate grade values
+    for (const grade of validGrades) {
+      if (grade.grade < 0 || grade.grade > grade.maxGrade) {
+        setNotification({ type: 'error', message: `Invalid grade for student. Grade must be between 0 and ${grade.maxGrade}` });
+        return;
+      }
     }
 
     setUploading(true);
@@ -239,25 +194,33 @@ export default function TeacherGrades() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Upload result:', result); // Debug log
-        alert('Grades successfully uploaded! / ग्रेड सफलतापूर्वक अपलोड हो गए!');
+        const successCount = result.results.filter(r => r.success).length;
+        setNotification({ 
+          type: 'success', 
+          message: `Grades successfully uploaded for ${successCount} student(s)! / ग्रेड सफलतापूर्वक अपलोड हो गए!` 
+        });
         // Don't reset gradeData, keep existing data
         fetchExistingGrades(selectedClass, selectedSubject);
       } else {
         const error = await response.json();
-        console.error('Upload error:', error); // Debug log
-        alert('Failed to upload grades: ' + error.error);
+        setNotification({ type: 'error', message: error.error || 'Failed to upload grades' });
       }
     } catch (error) {
-      console.error('Upload exception:', error); // Debug log
-      alert('Error uploading grades: ' + error.message);
+      setNotification({ type: 'error', message: error.message || 'Error uploading grades' });
     } finally {
       setUploading(false);
     }
   };
 
-  const deleteGrade = async (gradeId) => {
-    if (!confirm('क्या आप वाकई इस grade को हटाना चाहते हैं?')) return;
+  const handleDeleteClick = (gradeId) => {
+    setDeleteConfirm(gradeId);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+
+    const gradeId = deleteConfirm;
+    setDeleteConfirm(null);
 
     try {
       const response = await fetch(`/api/teacher/grades/${gradeId}`, {
@@ -265,14 +228,14 @@ export default function TeacherGrades() {
       });
 
       if (response.ok) {
-        alert('Grade deleted successfully! / ग्रेड सफलतापूर्वक हटा दिया गया!');
+        setNotification({ type: 'success', message: 'Grade deleted successfully! / ग्रेड सफलतापूर्वक हटा दिया गया!' });
         fetchExistingGrades(selectedClass, selectedSubject);
       } else {
         const error = await response.json();
-        alert('Failed to delete grade: ' + error.error);
+        setNotification({ type: 'error', message: error.error || 'Failed to delete grade' });
       }
     } catch (error) {
-      alert('Error deleting grade: ' + error.message);
+      setNotification({ type: 'error', message: error.message || 'Error deleting grade' });
     }
   };
 
@@ -287,6 +250,7 @@ export default function TeacherGrades() {
           <h1 className="text-2xl font-bold">Grade Management / ग्रेड प्रबंधन</h1>
         </div>
       </nav>
+      <TeacherNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="space-y-6">
@@ -365,15 +329,6 @@ export default function TeacherGrades() {
                   </div>
                 </div>
 
-                {/* Debug Info */}
-                <div className="bg-gray-100 p-3 rounded-md mb-4">
-                  <p className="text-xs text-gray-600">
-                    Debug: Classes found: {classes.length}, Subjects found: {subjects.length}
-                  </p>
-                  <p className="text-xs text-gray-600">
-                    Selected Class: {selectedClass}, Selected Subject: {selectedSubject}
-                  </p>
-                </div>
 
                 {/* Quick Actions */}
                 <div className="flex flex-wrap gap-2 mb-4">
@@ -577,8 +532,8 @@ export default function TeacherGrades() {
                           <td className="px-6 py-3">{new Date(grade.created_at).toLocaleDateString()}</td>
                           <td className="px-6 py-3">
                             <button
-                              onClick={() => deleteGrade(grade.id)}
-                              className="text-red-600 hover:text-red-900 text-sm"
+                              onClick={() => handleDeleteClick(grade.id)}
+                              className="text-red-600 hover:text-red-900 text-sm font-medium"
                             >
                               Delete / हटाएं
                             </button>
@@ -597,6 +552,25 @@ export default function TeacherGrades() {
           )}
         </div>
       </main>
+      
+      {/* Notification */}
+      <Notification
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification({ type: '', message: '' })}
+      />
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        title="Delete Grade / ग्रेड हटाएं"
+        message="Are you sure you want to delete this grade? This action cannot be undone. / क्या आप वाकई इस grade को हटाना चाहते हैं? यह कार्रवाई पूर्ववत नहीं की जा सकती।"
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm(null)}
+        confirmText="Delete / हटाएं"
+        cancelText="Cancel / रद्द करें"
+        confirmColor="bg-red-600"
+      />
     </div>
   );
 }

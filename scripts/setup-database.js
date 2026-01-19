@@ -1,9 +1,14 @@
-const mysql = require('mysql2/promise');
-const fs = require('fs');
-const path = require('path');
+import mysql from 'mysql2/promise';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env.local or .env
-const dotenv = require('dotenv');
 const envPath = path.join(__dirname, '..', '.env.local');
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });

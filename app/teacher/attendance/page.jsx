@@ -1,16 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Notification from '@/components/Notification';
+import ConfirmModal from '@/components/ConfirmModal';
+import TeacherNav from '@/components/TeacherNav';
 
-export default function TeacherAttendance() {
+function TeacherAttendanceContent() {
   const [classes, setClasses] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [selectedClass, setSelectedClass] = useState(null);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [markingLoading, setMarkingLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notification, setNotification] = useState({ type: '', message: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -36,15 +42,27 @@ export default function TeacherAttendance() {
 
   useEffect(() => {
     if (selectedClass) {
-      fetchStudents(selectedClass);
+      fetchSubjectsForClass(selectedClass);
+      if (selectedSubject) {
+        fetchStudents(selectedClass);
+      }
+    } else {
+      setSubjects([]);
+      setSelectedSubject(null);
     }
   }, [selectedClass]);
 
   useEffect(() => {
-    if (selectedClass && selectedDate) {
-      fetchAttendance(selectedClass, selectedDate);
+    if (selectedClass && selectedSubject) {
+      fetchStudents(selectedClass);
     }
-  }, [selectedClass, selectedDate]);
+  }, [selectedClass, selectedSubject]);
+
+  useEffect(() => {
+    if (selectedClass && selectedSubject && selectedDate) {
+      fetchAttendance(selectedClass, selectedSubject, selectedDate);
+    }
+  }, [selectedClass, selectedSubject, selectedDate]);
 
   const fetchClasses = async () => {
     try {
@@ -54,46 +72,52 @@ export default function TeacherAttendance() {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Classes data:', data);
-        
-        if (data && data.length > 0) {
+        console.log('Classes and subjects data:', data);
+        // Handle both old format (array) and new format (object with classes and subjects)
+        if (Array.isArray(data)) {
           setClasses(data);
+          setSubjects([]);
+        } else if (data && data.classes) {
+          setClasses(Array.isArray(data.classes) ? data.classes : []);
+          setSubjects(Array.isArray(data.subjects) ? data.subjects : []);
         } else {
-          // Add sample classes for testing
-          console.log('No classes found, adding sample classes...');
-          const sampleClasses = [
-            { id: '1', name: 'Grade 10A' },
-            { id: '2', name: 'Grade 10B' },
-            { id: '3', name: 'Grade 11A' }
-          ];
-          setClasses(sampleClasses);
+          setClasses([]);
+          setSubjects([]);
         }
       } else {
         const error = await response.json();
         console.error('Failed to fetch classes:', error);
-        alert('Failed to fetch classes: ' + error.error);
-        
-        // Add sample classes for testing
-        const sampleClasses = [
-          { id: '1', name: 'Grade 10A' },
-          { id: '2', name: 'Grade 10B' },
-          { id: '3', name: 'Grade 11A' }
-        ];
-        setClasses(sampleClasses);
+        setNotification({ type: 'error', message: 'Failed to fetch classes: ' + error.error });
+        setClasses([]);
       }
     } catch (error) {
       console.error('Failed to fetch classes:', error);
-      alert('Error fetching classes: ' + error.message);
-      
-      // Add sample classes for testing
-      const sampleClasses = [
-        { id: '1', name: 'Grade 10A' },
-        { id: '2', name: 'Grade 10B' },
-        { id: '3', name: 'Grade 11A' }
-      ];
-      setClasses(sampleClasses);
+      setNotification({ type: 'error', message: 'Error fetching classes: ' + error.message });
+      setClasses([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchSubjectsForClass = async (classId) => {
+    try {
+      const response = await fetch(`/api/teacher/attendance/subjects?classId=${classId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setSubjects(Array.isArray(data) ? data : []);
+        // If only one subject, auto-select it
+        if (data && data.length === 1) {
+          setSelectedSubject(String(data[0].id));
+        } else if (data && data.length > 0 && !selectedSubject) {
+          // Don't auto-select if multiple subjects
+          setSelectedSubject(null);
+        }
+      } else {
+        // Fallback to all subjects if class-specific fetch fails
+        console.error('Failed to fetch subjects for class');
+      }
+    } catch (error) {
+      console.error('Error fetching subjects for class:', error);
     }
   };
 
@@ -108,51 +132,58 @@ export default function TeacherAttendance() {
         console.log('Students data:', data);
         
         if (data && data.length > 0) {
-          setStudents(data);
+          // Set students with default status if not present
+          const studentsWithStatus = data.map(student => ({
+            ...student,
+            status: student.status || 'present',
+            notes: student.notes || ''
+          }));
+          setStudents(studentsWithStatus);
         } else {
-          // Add sample students for testing
-          console.log('No students found, adding sample students...');
-          const sampleStudents = [
-            { id: '1', name: 'Alice Student', email: 'alice@school.com', status: 'present', notes: '' },
-            { id: '2', name: 'Bob Student', email: 'bob@school.com', status: 'present', notes: '' },
-            { id: '3', name: 'Charlie Student', email: 'charlie@school.com', status: 'present', notes: '' }
-          ];
-          setStudents(sampleStudents);
+          console.log('No students found for this class');
+          setStudents([]);
         }
       } else {
         const error = await response.json();
         console.error('Error fetching students:', error);
-        
-        // Add sample students for testing
-        const sampleStudents = [
-          { id: '1', name: 'Alice Student', email: 'alice@school.com', status: 'present', notes: '' },
-          { id: '2', name: 'Bob Student', email: 'bob@school.com', status: 'present', notes: '' },
-          { id: '3', name: 'Charlie Student', email: 'charlie@school.com', status: 'present', notes: '' }
-        ];
-        setStudents(sampleStudents);
+        setStudents([]);
       }
     } catch (error) {
       console.error('Failed to fetch students:', error);
-      
-      // Add sample students for testing
-      const sampleStudents = [
-        { id: '1', name: 'Alice Student', email: 'alice@school.com', status: 'present', notes: '' },
-        { id: '2', name: 'Bob Student', email: 'bob@school.com', status: 'present', notes: '' },
-        { id: '3', name: 'Charlie Student', email: 'charlie@school.com', status: 'present', notes: '' }
-      ];
-      setStudents(sampleStudents);
+      setStudents([]);
     }
   };
 
-  const fetchAttendance = async (classId, date) => {
+  const fetchAttendance = async (classId, subjectId, date) => {
     try {
-      const response = await fetch(`/api/teacher/attendance/attendance?classId=${classId}&date=${date}`);
+      if (!classId || !date) return;
+      
+      const url = `/api/teacher/attendance/attendance?classId=${classId}&date=${date}${subjectId ? `&subjectId=${subjectId}` : ''}`;
+      const response = await fetch(url);
+      
       if (response.ok) {
         const data = await response.json();
-        setStudents(data);
+        // Always use real data from API
+        if (data && Array.isArray(data) && data.length > 0) {
+          // Ensure all students have status and notes
+          const studentsWithDefaults = data.map(student => ({
+            ...student,
+            status: student.status || 'present',
+            notes: student.notes || ''
+          }));
+          setStudents(studentsWithDefaults);
+        } else {
+          // If no attendance records exist, fetch students from enrollments
+          fetchStudents(classId);
+        }
+      } else {
+        // If error, fetch students from enrollments
+        fetchStudents(classId);
       }
     } catch (error) {
       console.error('Failed to fetch attendance:', error);
+      // On error, fetch students from enrollments
+      fetchStudents(classId);
     }
   };
 
@@ -169,7 +200,10 @@ export default function TeacherAttendance() {
   };
 
   const markAttendance = async () => {
-    if (!selectedClass || students.length === 0) return;
+    if (!selectedClass || !selectedSubject || students.length === 0) {
+      setNotification({ type: 'error', message: 'Please select class, subject, and ensure students are loaded' });
+      return;
+    }
 
     setMarkingLoading(true);
     try {
@@ -177,7 +211,7 @@ export default function TeacherAttendance() {
         studentId: student.id,
         status: student.status,
         notes: student.notes,
-        subjectId: selectedSubject || 1, // Default subject
+        subjectId: selectedSubject,
         classId: selectedClass,
         date: selectedDate
       }));
@@ -195,15 +229,19 @@ export default function TeacherAttendance() {
       });
 
       if (response.ok) {
-        alert('Attendance marked successfully! / उपस्थिति सफलतापूर्वक अपलोड हो गई!');
+        const result = await response.json();
+        setNotification({ 
+          type: 'success', 
+          message: `Attendance marked successfully for ${result.results.filter(r => r.success).length} students!` 
+        });
         // Refresh attendance data
-        fetchAttendance(selectedClass, selectedDate);
+        fetchAttendance(selectedClass, selectedSubject, selectedDate);
       } else {
         const error = await response.json();
-        alert('Failed to mark attendance: ' + error.error);
+        setNotification({ type: 'error', message: error.error || 'Failed to mark attendance' });
       }
     } catch (error) {
-      alert('Error marking attendance: ' + error.message);
+      setNotification({ type: 'error', message: error.message || 'Error marking attendance' });
     } finally {
       setMarkingLoading(false);
     }
@@ -240,26 +278,44 @@ export default function TeacherAttendance() {
           <h1 className="text-2xl font-bold">Mark Attendance / उपस्थिति अंकन</h1>
         </div>
       </nav>
+      <TeacherNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {!selectedClass ? (
+        {!selectedClass || !selectedSubject ? (
           <div className="bg-white rounded-lg shadow p-6 text-center">
-            <h3 className="text-xl font-semibold mb-4">Select a Class First / पहले एक कक्षा चुनें</h3>
-            <p className="text-gray-600">Choose a class to mark attendance</p>
+            <h3 className="text-xl font-semibold mb-4">
+              {!selectedClass ? 'Select a Class First / पहले एक कक्षा चुनें' : 'Select a Subject / विषय चुनें'}
+            </h3>
+            <p className="text-gray-600">
+              {!selectedClass ? 'Choose a class to mark attendance' : 'Choose a subject to mark attendance'}
+            </p>
             <div className="mt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Class / कक्षा चुनें</label>
                   <select
                     value={selectedClass || ''}
-                    onChange={(e) => setSelectedClass(e.target.value)}
+                    onChange={(e) => {
+                      setSelectedClass(e.target.value);
+                      setSelectedSubject(null); // Reset subject when class changes
+                      setStudents([]); // Clear students when class changes
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
                     <option value="">Select a class / कक्षा चुनें</option>
-                    {classes.map(cls => (
-                      <option key={cls.id} value={cls.id}>{cls.name}</option>
-                    ))}
+                    {classes.length > 0 ? (
+                      classes.map(cls => (
+                        <option key={cls.id} value={String(cls.id)}>{cls.name}</option>
+                      ))
+                    ) : (
+                      <option value="" disabled>No classes assigned / कोई कक्षा असाइन नहीं की गई</option>
+                    )}
                   </select>
+                  {classes.length === 0 && (
+                    <p className="text-xs text-red-600 mt-1">
+                      No classes found. Please contact admin to assign classes to you.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Subject / विषय चुनें</label>
@@ -267,13 +323,26 @@ export default function TeacherAttendance() {
                     value={selectedSubject || ''}
                     onChange={(e) => setSelectedSubject(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    disabled={!selectedClass}
                   >
                     <option value="">Select a subject / विषय चुनें</option>
-                    <option value="1">Mathematics / गणित</option>
-                    <option value="2">English / अंग्रज़ज़</option>
-                    <option value="3">Science / विज्ञान</option>
-                    <option value="4">History / इतिहास</option>
+                    {subjects.length > 0 ? (
+                      subjects.map(subject => (
+                        <option key={subject.id} value={String(subject.id)}>
+                          {subject.name} {subject.code ? `(${subject.code})` : ''}
+                        </option>
+                      ))
+                    ) : selectedClass ? (
+                      <option value="" disabled>No subjects found for this class / इस कक्षा के लिए कोई विषय नहीं मिला</option>
+                    ) : (
+                      <option value="" disabled>Select a class first / पहले कक्षा चुनें</option>
+                    )}
                   </select>
+                  {selectedClass && subjects.length === 0 && (
+                    <p className="text-xs text-yellow-600 mt-1">
+                      No subjects found for this class. Please check your timetable assignments.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Select Date / दिनांक चुनें</label>
@@ -325,13 +394,34 @@ export default function TeacherAttendance() {
               <div className="flex justify-between items-center mb-4">
                 <div>
                   <h2 className="text-xl font-semibold">
-                    {classes.find(c => c.id === selectedClass)?.name || 'Mark Attendance'}
+                    {classes.find(c => String(c.id) === String(selectedClass))?.name || 'Mark Attendance'}
                   </h2>
                   <div className="text-gray-600">
-                    {selectedDate ? `for ${new Date(selectedDate).toLocaleDateString('hi-IN')}` : 'Select a date'}
+                    {selectedSubject && (
+                      <span className="mr-2">
+                        Subject: {
+                          subjects.find(s => String(s.id) === String(selectedSubject))?.name || 
+                          (selectedSubject === '1' ? 'Mathematics / गणित' :
+                          selectedSubject === '2' ? 'English / अंग्रज़ज़' :
+                          selectedSubject === '3' ? 'Science / विज्ञान' :
+                          selectedSubject === '4' ? 'History / इतिहास' : 'Unknown')
+                        }
+                      </span>
+                    )}
+                    {selectedDate ? `- ${new Date(selectedDate).toLocaleDateString('hi-IN')}` : 'Select a date'}
                   </div>
                 </div>
                 <div className="flex space-x-4">
+                  <button
+                    onClick={() => {
+                      setSelectedClass(null);
+                      setSelectedSubject(null);
+                      setStudents([]);
+                    }}
+                    className="px-3 py-1 bg-gray-500 text-white rounded-md hover:bg-gray-600 text-sm"
+                  >
+                    Change Class/Subject / कक्षा/विषय बदलें
+                  </button>
                   <button
                     onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
                     className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm"
@@ -397,19 +487,9 @@ export default function TeacherAttendance() {
                 <h3 className="text-lg font-semibold mb-4">
                   Students / छात्र ({students.length})
                 </h3>
-                <p className="text-sm text-gray-600">
-                  {selectedClass ? `${classes.find(c => c.id === selectedClass)?.name} - ${new Date(selectedDate).toLocaleDateString('hi-IN')}` : 'Select a class and date'}
-                </p>
-                
-                {/* Debug Info */}
-                <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
-                  <p className="font-semibold">Debug Information:</p>
-                  <p>Classes found: {classes.length}</p>
-                  <p>Students found: {students.length}</p>
-                  <p>Selected Class: {selectedClass}</p>
-                  <p>Selected Date: {selectedDate}</p>
-                  <p>Loading: {loading ? 'Yes' : 'No'}</p>
-                </div>
+                     <p className="text-sm text-gray-600">
+                       {selectedClass ? `${classes.find(c => String(c.id) === String(selectedClass))?.name || 'Unknown Class'} - ${selectedDate ? new Date(selectedDate).toLocaleDateString('hi-IN') : 'No date'}` : 'Select a class and date'}
+                     </p>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full">
@@ -492,6 +572,21 @@ export default function TeacherAttendance() {
           </div>
         )}
       </main>
+      
+      {/* Notification */}
+      <Notification
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification({ type: '', message: '' })}
+      />
     </div>
+  );
+}
+
+export default function TeacherAttendance() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen">Loading...</div>}>
+      <TeacherAttendanceContent />
+    </Suspense>
   );
 }

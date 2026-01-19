@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Notification from '@/components/Notification';
+import ConfirmModal from '@/components/ConfirmModal';
+import TeacherNav from '@/components/TeacherNav';
 
 export default function TeacherTimetable() {
   const [timetable, setTimetable] = useState([]);
@@ -17,6 +20,8 @@ export default function TeacherTimetable() {
     endTime: '',
     room: ''
   });
+  const [notification, setNotification] = useState({ type: '', message: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -56,6 +61,12 @@ export default function TeacherTimetable() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Validate time
+    if (formData.startTime >= formData.endTime) {
+      setNotification({ type: 'error', message: 'End time must be after start time' });
+      return;
+    }
+    
     const url = editingEntry ? `/api/teacher/timetable/${editingEntry.id}` : '/api/teacher/timetable';
     const method = editingEntry ? 'PUT' : 'POST';
 
@@ -69,7 +80,10 @@ export default function TeacherTimetable() {
       });
 
       if (response.ok) {
-        alert(editingEntry ? 'Timetable updated successfully!' : 'Timetable entry added successfully!');
+        setNotification({ 
+          type: 'success', 
+          message: editingEntry ? 'Timetable updated successfully!' : 'Timetable entry added successfully!' 
+        });
         setShowAddForm(false);
         setEditingEntry(null);
         setFormData({
@@ -83,10 +97,10 @@ export default function TeacherTimetable() {
         fetchTimetable();
       } else {
         const error = await response.json();
-        alert('Failed to save timetable: ' + error.error);
+        setNotification({ type: 'error', message: error.error || 'Failed to save timetable' });
       }
     } catch (error) {
-      alert('Error saving timetable: ' + error.message);
+      setNotification({ type: 'error', message: error.message || 'Error saving timetable' });
     }
   };
 
@@ -103,8 +117,15 @@ export default function TeacherTimetable() {
     setShowAddForm(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this timetable entry?')) return;
+  const handleDeleteClick = (id) => {
+    setDeleteConfirm(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirm) return;
+
+    const id = deleteConfirm;
+    setDeleteConfirm(null);
 
     try {
       const response = await fetch(`/api/teacher/timetable/${id}`, {
@@ -112,14 +133,14 @@ export default function TeacherTimetable() {
       });
 
       if (response.ok) {
-        alert('Timetable entry deleted successfully!');
+        setNotification({ type: 'success', message: 'Timetable entry deleted successfully!' });
         fetchTimetable();
       } else {
         const error = await response.json();
-        alert('Failed to delete timetable: ' + error.error);
+        setNotification({ type: 'error', message: error.error || 'Failed to delete timetable' });
       }
     } catch (error) {
-      alert('Error deleting timetable: ' + error.message);
+      setNotification({ type: 'error', message: error.message || 'Error deleting timetable' });
     }
   };
 
@@ -137,16 +158,17 @@ export default function TeacherTimetable() {
       <nav className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold">My Timetable</h1>
+            <h1 className="text-2xl font-bold">My Timetable / मेरा समय सारणी</h1>
             <button
               onClick={() => setShowAddForm(true)}
               className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
             >
-              Add Entry
+              Add Entry / प्रविष्टि जोड़ें
             </button>
           </div>
         </div>
       </nav>
+      <TeacherNav />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Add/Edit Form Modal */}
@@ -292,7 +314,7 @@ export default function TeacherTimetable() {
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(entry.id)}
+                            onClick={() => handleDeleteClick(entry.id)}
                             className="text-red-600 hover:text-red-900 text-sm"
                           >
                             Delete
@@ -309,6 +331,25 @@ export default function TeacherTimetable() {
           ))}
         </div>
       </main>
+      
+      {/* Notification */}
+      <Notification
+        type={notification.type}
+        message={notification.message}
+        onClose={() => setNotification({ type: '', message: '' })}
+      />
+      
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirm !== null}
+        title="Delete Timetable Entry"
+        message="Are you sure you want to delete this timetable entry? This action cannot be undone."
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setDeleteConfirm(null)}
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmColor="bg-red-600"
+      />
     </div>
   );
 }

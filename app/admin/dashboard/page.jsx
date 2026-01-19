@@ -51,10 +51,22 @@ export default async function AdminDashboard() {
         </div>
 
         {/* Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           <a href="/admin/users" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
             <h3 className="text-lg font-semibold mb-2">👥 Manage Users</h3>
             <p className="text-gray-600">Add, edit, delete users</p>
+          </a>
+          <a href="/admin/classes" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <h3 className="text-lg font-semibold mb-2">🏫 Manage Classes</h3>
+            <p className="text-gray-600">Create and manage classes</p>
+          </a>
+          <a href="/admin/enrollments" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <h3 className="text-lg font-semibold mb-2">🎓 Enroll Students</h3>
+            <p className="text-gray-600">Add students to classes</p>
+          </a>
+          <a href="/admin/assignments" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
+            <h3 className="text-lg font-semibold mb-2">📚 Assign Classes</h3>
+            <p className="text-gray-600">Assign multiple classes to teachers</p>
           </a>
           <a href="/admin/upload" className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition">
             <h3 className="text-lg font-semibold mb-2">📤 Bulk Upload</h3>
