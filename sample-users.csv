@@ -1,0 +1,6 @@
+name,email,password,role
+Alice Johnson,alice@school.com,password123,student
+Bob Smith,bob@school.com,password123,teacher
+Charlie Brown,charlie@school.com,password123,student
+Diana Davis,diana@school.com,password123,teacher
+Eve Wilson,eve@school.com,password123,student
